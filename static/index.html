@@ -38,22 +38,24 @@
 
       <!-- SIDEBAR -->
       <aside class="sidebar">
-        <div class="sidebar-header">
-          <span class="sidebar-title">CATEGORIES</span>
-          <button id="btn-add-category" class="icon-btn" @click="addCategory" title="New category">＋</button>
+        <div class="sidebar-sticky">
+          <div class="sidebar-header">
+            <span class="sidebar-title">CATEGORIES</span>
+            <button id="btn-add-category" class="icon-btn" @click="addCategory" title="New category">＋</button>
+          </div>
+          <ul class="category-list">
+            <li
+              v-for="cat in categories"
+              :key="cat.id"
+              class="category-item"
+              :class="{ active: selectedCategoryId === cat.id }"
+              @click="selectCategory(cat.id)"
+            >
+              <span class="category-name">{{ cat.name }}</span>
+              <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
+            </li>
+          </ul>
         </div>
-        <ul class="category-list">
-          <li
-            v-for="cat in categories"
-            :key="cat.id"
-            class="category-item"
-            :class="{ active: selectedCategoryId === cat.id }"
-            @click="selectCategory(cat.id)"
-          >
-            <span class="category-name">{{ cat.name }}</span>
-            <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
-          </li>
-        </ul>
       </aside>
 
       <!-- MAIN AREA -->
@@ -179,6 +181,22 @@
     <!-- Error banner -->
     <div v-if="errorMsg" class="error-banner" @click="errorMsg = ''">
       ⚠️ {{ errorMsg }} <span class="error-dismiss">✕</span>
+    </div>
+
+    <!-- ── TOAST CONTAINER ────────────────────────────── -->
+    <div class="toast-container">
+      <transition-group name="toast">
+        <div
+          v-for="toast in toasts"
+          :key="toast.id"
+          class="toast"
+          :class="'toast-' + toast.type"
+          @click="removeToast(toast.id)"
+        >
+          <span class="toast-icon">{{ toast.type === 'success' ? '✓' : 'ℹ️' }}</span>
+          <span class="toast-message">{{ toast.message }}</span>
+        </div>
+      </transition-group>
     </div>
 
   </div><!-- #app -->

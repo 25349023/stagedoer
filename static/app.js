@@ -131,6 +131,9 @@ createApp({
         isDanger: false,
         confirmText: 'OK',
       },
+
+      // Toasts
+      toasts: [],
     };
   },
 
@@ -221,6 +224,20 @@ createApp({
     },
 
     // ----------------------------------------------------------
+    // Toasts
+    // ----------------------------------------------------------
+    showToast(message, type = 'success') {
+      const id = Date.now() + Math.random();
+      this.toasts.push({ id, message, type });
+      setTimeout(() => {
+        this.toasts = this.toasts.filter(t => t.id !== id);
+      }, 3000);
+    },
+    removeToast(id) {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+    },
+
+    // ----------------------------------------------------------
     // Theme
     // ----------------------------------------------------------
     toggleDark() {
@@ -241,6 +258,7 @@ createApp({
       if (!name || !name.trim()) return;
       const cat = await this.api('POST', '/categories/', { name: name.trim() });
       this.categories.push(cat);
+      this.showToast(`Category "${cat.name}" created`);
     },
 
     async deleteCategory(id) {
@@ -248,6 +266,7 @@ createApp({
       if (!confirmed) return;
       await this.api('DELETE', `/categories/${id}`);
       this.categories = this.categories.filter(c => c.id !== id);
+      this.showToast('Category deleted');
       if (this.selectedCategoryId === id) {
         this.tasks = [];
         this.selectedCategoryId = this.categories[0]?.id || null;
@@ -274,6 +293,7 @@ createApp({
       const tt = await this.api('POST', '/task-types/', { name: name.trim(), stages: stageList });
       this.taskTypes.push(tt);
       this.newTypeForm = { name: '', stages: '' };
+      this.showToast(`Task type "${tt.name}" created`);
     },
 
     async deleteTaskType(id) {
@@ -282,6 +302,7 @@ createApp({
       try {
         await this.api('DELETE', `/task-types/${id}`);
         this.taskTypes = this.taskTypes.filter(t => t.id !== id);
+        this.showToast('Task type deleted');
       } catch {
         // errorMsg already set in api()
       }
@@ -321,8 +342,11 @@ createApp({
     },
 
     async deleteTask(id) {
+      const confirmed = await this.openConfirm('Delete Task', 'Are you sure you want to delete this task?', true, 'Delete');
+      if (!confirmed) return;
       await this.api('DELETE', `/tasks/${id}`);
       this.tasks = removeTaskFromTree(this.tasks, id);
+      this.showToast('Task deleted');
     },
 
     async updateTaskTitle(id, title) {
