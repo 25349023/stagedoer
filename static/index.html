@@ -150,6 +150,32 @@
       </div>
     </div>
 
+    <!-- ── MODAL: CONFIRM / PROMPT ────────────────────────────── -->
+    <div v-if="dialog.show" class="modal-overlay" @click.self="closeDialog(false)" style="z-index: 300;">
+      <div class="modal-card dialog-card" style="width: 400px;">
+        <div class="modal-header" style="margin-bottom: 12px;">
+          <h2>{{ dialog.title }}</h2>
+          <button class="icon-btn" @click="closeDialog(false)">×</button>
+        </div>
+        <p v-if="dialog.message" class="dialog-message" style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.4;">{{ dialog.message }}</p>
+        <div v-if="dialog.type === 'prompt'" class="modal-form" style="margin-top: 16px;">
+          <input
+            ref="dialogInput"
+            v-model="dialog.input"
+            class="input"
+            :placeholder="dialog.placeholder"
+            @keyup.enter="closeDialog(true)"
+          />
+        </div>
+        <div class="dialog-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+          <button class="btn btn-secondary" @click="closeDialog(false)">Cancel</button>
+          <button class="btn" :class="dialog.isDanger ? 'btn-danger' : 'btn-primary'" @click="closeDialog(true)">
+            {{ dialog.confirmText }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Error banner -->
     <div v-if="errorMsg" class="error-banner" @click="errorMsg = ''">
       ⚠️ {{ errorMsg }} <span class="error-dismiss">✕</span>

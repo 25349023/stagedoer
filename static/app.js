@@ -118,6 +118,19 @@ createApp({
       // Forms
       newTaskForm: { title: '', task_type_id: '', parent_task_id: null },
       newTypeForm: { name: '', stages: '' },
+
+      // Dialog
+      dialog: {
+        show: false,
+        type: 'confirm',
+        title: '',
+        message: '',
+        input: '',
+        placeholder: '',
+        resolve: null,
+        isDanger: false,
+        confirmText: 'OK',
+      },
     };
   },
 
@@ -180,6 +193,34 @@ createApp({
     },
 
     // ----------------------------------------------------------
+    // Dialogs
+    // ----------------------------------------------------------
+    openConfirm(title, message, isDanger = false, confirmText = 'Confirm') {
+      return new Promise(resolve => {
+        this.dialog = { show: true, type: 'confirm', title, message, input: '', resolve, isDanger, confirmText };
+      });
+    },
+    openPrompt(title, placeholder = '') {
+      return new Promise(resolve => {
+        this.dialog = { show: true, type: 'prompt', title, message: '', input: '', placeholder, resolve, isDanger: false, confirmText: 'OK' };
+        this.$nextTick(() => {
+          if (this.$refs.dialogInput) this.$refs.dialogInput.focus();
+        });
+      });
+    },
+    closeDialog(confirmed) {
+      this.dialog.show = false;
+      if (this.dialog.resolve) {
+        if (this.dialog.type === 'prompt') {
+          this.dialog.resolve(confirmed ? this.dialog.input : null);
+        } else {
+          this.dialog.resolve(confirmed);
+        }
+        this.dialog.resolve = null;
+      }
+    },
+
+    // ----------------------------------------------------------
     // Theme
     // ----------------------------------------------------------
     toggleDark() {
@@ -196,14 +237,15 @@ createApp({
     },
 
     async addCategory() {
-      const name = prompt('Category name:');
+      const name = await this.openPrompt('New Category', 'Category name...');
       if (!name || !name.trim()) return;
       const cat = await this.api('POST', '/categories/', { name: name.trim() });
       this.categories.push(cat);
     },
 
     async deleteCategory(id) {
-      if (!confirm('Delete this category and all its tasks?')) return;
+      const confirmed = await this.openConfirm('Delete Category', 'Delete this category and all its tasks?', true, 'Delete');
+      if (!confirmed) return;
       await this.api('DELETE', `/categories/${id}`);
       this.categories = this.categories.filter(c => c.id !== id);
       if (this.selectedCategoryId === id) {
@@ -235,7 +277,8 @@ createApp({
     },
 
     async deleteTaskType(id) {
-      if (!confirm('Delete this task type?')) return;
+      const confirmed = await this.openConfirm('Delete Task Type', 'Delete this task type?', true, 'Delete');
+      if (!confirmed) return;
       try {
         await this.api('DELETE', `/task-types/${id}`);
         this.taskTypes = this.taskTypes.filter(t => t.id !== id);
