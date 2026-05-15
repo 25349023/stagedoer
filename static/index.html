@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StageDoer — Multi-Stage Todo</title>
+  <meta name="description" content="StageDoer: track tasks through custom stages with nested subtasks and category organisation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Anti-FOUC: apply dark class synchronously before first paint -->
+  <script>
+    if (localStorage.getItem('stagedoer-dark') === 'true') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="app" v-cloak>
+
+    <!-- ── TOP BAR ──────────────────────────────────────────────── -->
+    <header class="topbar">
+      <span class="topbar-logo">StageDoer</span>
+      <div class="topbar-actions">
+        <button id="btn-manage-types" class="btn btn-secondary" @click="showTaskTypeModal = true">
+          Manage Task Types
+        </button>
+        <button id="btn-theme-toggle" class="theme-toggle" @click="toggleDark" :title="darkMode ? 'Switch to light' : 'Switch to dark'">
+          <span v-if="darkMode">☀️</span>
+          <span v-else>🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── MAIN LAYOUT ──────────────────────────────────────────── -->
+    <div class="layout">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">CATEGORIES</span>
+          <button id="btn-add-category" class="icon-btn" @click="addCategory" title="New category">＋</button>
+        </div>
+        <ul class="category-list">
+          <li
+            v-for="cat in categories"
+            :key="cat.id"
+            class="category-item"
+            :class="{ active: selectedCategoryId === cat.id }"
+            @click="selectCategory(cat.id)"
+          >
+            <span class="category-name">{{ cat.name }}</span>
+            <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
+          </li>
+        </ul>
+      </aside>
+
+      <!-- MAIN AREA -->
+      <main class="main-area">
+        <div v-if="selectedCategory" class="main-header">
+          <h1 class="main-title">{{ selectedCategory.name }}</h1>
+          <button id="btn-add-task" class="btn btn-primary" @click="openAddTask(null)">＋ Add Task</button>
+        </div>
+        <div v-else class="empty-state">
+          <p>Select or create a category to get started.</p>
+        </div>
+
+        <div class="task-list" v-if="selectedCategory">
+          <task-item
+            v-for="task in tasks"
+            :key="task.id"
+            :task="task"
+            :task-types="taskTypes"
+            @advance="advanceStage"
+            @set-stage="setStage"
+            @rename="updateTaskTitle"
+            @add-sub="openAddTask"
+            @delete="deleteTask"
+          ></task-item>
+        </div>
+      </main>
+    </div>
+
+    <!-- ── MODAL: MANAGE TASK TYPES ────────────────────────────── -->
+    <div v-if="showTaskTypeModal" class="modal-overlay" @click.self="showTaskTypeModal = false">
+      <div class="modal-card" id="modal-task-types">
+        <div class="modal-header">
+          <h2>Manage Task Types</h2>
+          <button class="icon-btn" @click="showTaskTypeModal = false">×</button>
+        </div>
+
+        <div class="type-list">
+          <div v-for="tt in taskTypes" :key="tt.id" class="type-row">
+            <div class="type-info">
+              <span class="type-name">{{ tt.name }}</span>
+              <div class="stage-badges">
+                <span v-for="s in tt.stages" :key="s.id" class="stage-badge">{{ s.name }}</span>
+              </div>
+            </div>
+            <button class="btn btn-danger btn-sm" @click="deleteTaskType(tt.id)">Delete</button>
+          </div>
+          <div v-if="taskTypes.length === 0" class="empty-hint">No task types yet.</div>
+        </div>
+
+        <div class="modal-divider"></div>
+        <h3 class="modal-sub">Create New Type</h3>
+        <form @submit.prevent="createTaskType" class="modal-form">
+          <input
+            id="new-type-name"
+            v-model="newTypeForm.name"
+            class="input"
+            placeholder="Type name (e.g. CCR)"
+            required
+          />
+          <input
+            id="new-type-stages"
+            v-model="newTypeForm.stages"
+            class="input"
+            placeholder="Stages, comma-separated (e.g. Todo, In Progress, Done)"
+            required
+          />
+          <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── MODAL: ADD TASK / SUBTASK ────────────────────────────── -->
+    <div v-if="showAddTaskModal" class="modal-overlay" @click.self="showAddTaskModal = false">
+      <div class="modal-card" id="modal-add-task">
+        <div class="modal-header">
+          <h2>{{ newTaskForm.parent_task_id ? 'Add Subtask' : 'Add Task' }}</h2>
+          <button class="icon-btn" @click="showAddTaskModal = false">×</button>
+        </div>
+        <form @submit.prevent="addTask" class="modal-form">
+          <input
+            id="new-task-title"
+            v-model="newTaskForm.title"
+            class="input"
+            placeholder="Task title"
+            required
+            autofocus
+          />
+          <select id="new-task-type" v-model="newTaskForm.task_type_id" class="input" required>
+            <option disabled value="">Select task type</option>
+            <option v-for="tt in taskTypes" :key="tt.id" :value="tt.id">{{ tt.name }}</option>
+          </select>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Error banner -->
+    <div v-if="errorMsg" class="error-banner" @click="errorMsg = ''">
+      ⚠️ {{ errorMsg }} <span class="error-dismiss">✕</span>
+    </div>
+
+  </div><!-- #app -->
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+
+stagedoer.db
+
+SPEC.md
+layout.png
