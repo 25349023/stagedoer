@@ -52,7 +52,10 @@
               @click="selectCategory(cat.id)"
             >
               <span class="category-name">{{ cat.name }}</span>
-              <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
+              <div class="category-actions" style="display: flex; gap: 4px;">
+                <button class="category-edit" style="background: none; border: none; cursor: pointer; color: var(--text-muted);" @click.stop="renameCategory(cat.id, cat.name)" title="Rename category">✎</button>
+                <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
+              </div>
             </li>
           </ul>
         </div>
@@ -76,6 +79,7 @@
             :task-types="taskTypes"
             @advance="advanceStage"
             @set-stage="setStage"
+            @change-type="changeTaskType"
             @rename="updateTaskTitle"
             @add-sub="openAddTask"
             @delete="deleteTask"
@@ -100,29 +104,35 @@
                 <span v-for="s in tt.stages" :key="s.id" class="stage-badge">{{ s.name }}</span>
               </div>
             </div>
-            <button class="btn btn-danger btn-sm" @click="deleteTaskType(tt.id)">Delete</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" @click="editTaskType(tt)">Edit</button>
+              <button class="btn btn-danger btn-sm" @click="deleteTaskType(tt.id)">Delete</button>
+            </div>
           </div>
           <div v-if="taskTypes.length === 0" class="empty-hint">No task types yet.</div>
         </div>
 
         <div class="modal-divider"></div>
-        <h3 class="modal-sub">Create New Type</h3>
-        <form @submit.prevent="createTaskType" class="modal-form">
+        <h3 class="modal-sub">{{ typeForm.id ? 'Edit Task Type' : 'Create New Type' }}</h3>
+        <form @submit.prevent="saveTaskType" class="modal-form">
           <input
-            id="new-type-name"
-            v-model="newTypeForm.name"
+            id="type-name"
+            v-model="typeForm.name"
             class="input"
             placeholder="Type name (e.g. CCR)"
             required
           />
           <input
-            id="new-type-stages"
-            v-model="newTypeForm.stages"
+            id="type-stages"
+            v-model="typeForm.stages"
             class="input"
             placeholder="Stages, comma-separated (e.g. Todo, In Progress, Done)"
             required
           />
-          <button type="submit" class="btn btn-primary">Create</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary">{{ typeForm.id ? 'Save' : 'Create' }}</button>
+            <button type="button" class="btn btn-secondary" v-if="typeForm.id" @click="cancelEditTaskType">Cancel</button>
+          </div>
         </form>
       </div>
     </div>

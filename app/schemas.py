@@ -83,6 +83,7 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     current_stage_id: Optional[int] = None
+    task_type_id: Optional[int] = None
 
 
 class TaskOut(BaseModel):

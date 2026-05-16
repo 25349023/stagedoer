@@ -7,7 +7,7 @@ const TaskItem = {
     task: { type: Object, required: true },
     taskTypes: { type: Array, required: true },
   },
-  emits: ['advance', 'set-stage', 'rename', 'add-sub', 'delete'],
+  emits: ['advance', 'set-stage', 'change-type', 'rename', 'add-sub', 'delete'],
   computed: {
     taskStages() {
       const tt = this.taskTypes.find(t => t.id === this.task.task_type_id);
@@ -38,6 +38,9 @@ const TaskItem = {
     onStageChange(e) {
       this.$emit('set-stage', this.task.id, parseInt(e.target.value, 10));
     },
+    onTaskTypeChange(e) {
+      this.$emit('change-type', this.task.id, parseInt(e.target.value, 10));
+    },
     forwardEvent(name, ...args) {
       this.$emit(name, ...args);
     },
@@ -51,6 +54,16 @@ const TaskItem = {
           @click="$emit('advance', task.id)"
           :title="'Click to advance stage'"
         >{{ stageLabel }}</span>
+
+        <select
+          class="stage-select"
+          :value="task.task_type_id"
+          @change="onTaskTypeChange"
+          title="Task type"
+          style="margin-right: 4px;"
+        >
+          <option v-for="tt in taskTypes" :key="tt.id" :value="tt.id">{{ tt.name }}</option>
+        </select>
 
         <select
           class="stage-select"
@@ -79,6 +92,7 @@ const TaskItem = {
           :task-types="taskTypes"
           @advance="(id) => forwardEvent('advance', id)"
           @set-stage="(id, stageId) => forwardEvent('set-stage', id, stageId)"
+          @change-type="(id, typeId) => forwardEvent('change-type', id, typeId)"
           @rename="(id, title) => forwardEvent('rename', id, title)"
           @add-sub="(id) => forwardEvent('add-sub', id)"
           @delete="(id) => forwardEvent('delete', id)"
@@ -117,7 +131,7 @@ createApp({
 
       // Forms
       newTaskForm: { title: '', task_type_id: '', parent_task_id: null },
-      newTypeForm: { name: '', stages: '' },
+      typeForm: { id: null, name: '', stages: '' },
 
       // Dialog
       dialog: {
@@ -274,6 +288,17 @@ createApp({
       }
     },
 
+    async renameCategory(id, oldName) {
+      const newName = await this.openPrompt('Rename Category', oldName);
+      if (!newName || !newName.trim() || newName.trim() === oldName) return;
+      const cat = await this.api('PUT', `/categories/${id}`, { name: newName.trim() });
+      const idx = this.categories.findIndex(c => c.id === id);
+      if (idx !== -1) {
+        this.categories[idx] = cat;
+      }
+      this.showToast(`Category renamed to "${cat.name}"`);
+    },
+
     async selectCategory(id) {
       this.selectedCategoryId = id;
       await this.fetchTasks(id);
@@ -286,14 +311,66 @@ createApp({
       this.taskTypes = await this.api('GET', '/task-types/');
     },
 
-    async createTaskType() {
-      const { name, stages } = this.newTypeForm;
+    async saveTaskType() {
+      const { id, name, stages } = this.typeForm;
       if (!name.trim() || !stages.trim()) return;
       const stageList = stages.split(',').map(s => s.trim()).filter(Boolean);
-      const tt = await this.api('POST', '/task-types/', { name: name.trim(), stages: stageList });
-      this.taskTypes.push(tt);
-      this.newTypeForm = { name: '', stages: '' };
-      this.showToast(`Task type "${tt.name}" created`);
+
+      if (id) {
+        // Edit
+        const tt = this.taskTypes.find(t => t.id === id);
+        let updatedTt = tt;
+        if (name.trim() !== tt.name) {
+          updatedTt = await this.api('PUT', `/task-types/${id}`, { name: name.trim() });
+        }
+        
+        const currentStagesStr = tt.stages.map(s => s.name).join(', ');
+        const newStagesStr = stageList.join(', ');
+        
+        if (newStagesStr !== currentStagesStr) {
+          const unmappedExisting = [...tt.stages];
+          const unmappedNewIndices = [];
+          const stagesPayload = new Array(stageList.length);
+          
+          // Pass 1: exact matches
+          for (let i = 0; i < stageList.length; i++) {
+            const stgName = stageList[i];
+            const matchIdx = unmappedExisting.findIndex(s => s.name === stgName);
+            if (matchIdx !== -1) {
+              const existing = unmappedExisting.splice(matchIdx, 1)[0];
+              stagesPayload[i] = { id: existing.id, name: stgName, position: i };
+            } else {
+              unmappedNewIndices.push(i);
+            }
+          }
+          
+          // Pass 2: pair up remaining
+          for (const i of unmappedNewIndices) {
+            const stgName = stageList[i];
+            if (unmappedExisting.length > 0) {
+              const existing = unmappedExisting.shift();
+              stagesPayload[i] = { id: existing.id, name: stgName, position: i };
+            } else {
+              stagesPayload[i] = { id: null, name: stgName, position: i };
+            }
+          }
+          
+          updatedTt = await this.api('PUT', `/task-types/${id}/stages`, stagesPayload);
+        }
+        
+        const idx = this.taskTypes.findIndex(t => t.id === id);
+        if (idx !== -1) {
+          this.taskTypes[idx] = updatedTt;
+        }
+        this.showToast(`Task type updated`);
+        this.cancelEditTaskType();
+      } else {
+        // Create
+        const tt = await this.api('POST', '/task-types/', { name: name.trim(), stages: stageList });
+        this.taskTypes.push(tt);
+        this.typeForm = { id: null, name: '', stages: '' };
+        this.showToast(`Task type "${tt.name}" created`);
+      }
     },
 
     async deleteTaskType(id) {
@@ -306,6 +383,18 @@ createApp({
       } catch {
         // errorMsg already set in api()
       }
+    },
+
+    editTaskType(tt) {
+      this.typeForm = {
+        id: tt.id,
+        name: tt.name,
+        stages: tt.stages.map(s => s.name).join(', ')
+      };
+    },
+
+    cancelEditTaskType() {
+      this.typeForm = { id: null, name: '', stages: '' };
     },
 
     // ----------------------------------------------------------
@@ -361,6 +450,11 @@ createApp({
 
     async setStage(id, stageId) {
       const updated = await this.api('PUT', `/tasks/${id}`, { current_stage_id: stageId });
+      this.tasks = replaceTaskInTree(this.tasks, updated);
+    },
+
+    async changeTaskType(id, typeId) {
+      const updated = await this.api('PUT', `/tasks/${id}`, { task_type_id: typeId });
       this.tasks = replaceTaskInTree(this.tasks, updated);
     },
   },

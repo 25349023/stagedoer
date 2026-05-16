@@ -90,5 +90,5 @@ async def upsert_stages(
             db.add(Stage(task_type_id=tt_id, name=s.name, position=s.position))
 
     await db.commit()
-    result = await db.execute(_with_stages(select(TaskType).where(TaskType.id == tt_id)))
+    result = await db.execute(_with_stages(select(TaskType).where(TaskType.id == tt_id).execution_options(populate_existing=True)))
     return result.scalar_one()

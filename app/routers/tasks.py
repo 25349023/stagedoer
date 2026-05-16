@@ -101,6 +101,18 @@ async def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
     if body.title is not None:
         task.title = body.title
+    if body.task_type_id is not None and body.task_type_id != task.task_type_id:
+        task.task_type_id = body.task_type_id
+        if body.current_stage_id is None:
+            # Resolve first stage of the new task type
+            stages_result = await db.execute(
+                select(Stage)
+                .where(Stage.task_type_id == body.task_type_id)
+                .order_by(Stage.position)
+                .limit(1)
+            )
+            first_stage = stages_result.scalar_one_or_none()
+            task.current_stage_id = first_stage.id if first_stage else None
     if body.current_stage_id is not None:
         task.current_stage_id = body.current_stage_id
     await db.commit()
