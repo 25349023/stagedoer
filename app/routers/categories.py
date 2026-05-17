@@ -17,8 +17,10 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=CategoryOut, status_code=201)
 async def create_category(body: CategoryCreate, db: AsyncSession = Depends(get_db)):
-    max_pos = await db.scalar(select(func.max(Category.position))) or -1
-    cat = Category(name=body.name, position=max_pos + 1)
+    max_pos = await db.scalar(select(func.max(Category.position)))
+    if max_pos is None:
+        max_pos = 0
+    cat = Category(name=body.name, position=max_pos + 2000)
     db.add(cat)
     await db.commit()
     await db.refresh(cat)

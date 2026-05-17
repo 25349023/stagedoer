@@ -297,15 +297,39 @@ createApp({
       const item = this.categories.splice(fromIndex, 1)[0];
       this.categories.splice(toIndex, 0, item);
 
-      // Re-assign positions
-      this.categories.forEach((cat, idx) => {
-        cat.position = idx;
-      });
+      let newPos;
+      if (this.categories.length === 1) {
+        newPos = 2000;
+      } else if (toIndex === 0) {
+        newPos = this.categories[1].position - 2000;
+      } else if (toIndex === this.categories.length - 1) {
+        newPos = this.categories[toIndex - 1].position + 2000;
+      } else {
+        const prevPos = this.categories[toIndex - 1].position;
+        const nextPos = this.categories[toIndex + 1].position;
+        newPos = Math.floor((prevPos + nextPos) / 2);
+      }
 
-      // Update API
-      await Promise.all(this.categories.map((cat) =>
-        this.api('PUT', `/categories/${cat.id}`, { position: cat.position })
-      ));
+      let needsReindex = false;
+      if (toIndex > 0 && newPos <= this.categories[toIndex - 1].position) {
+        needsReindex = true;
+      }
+      if (toIndex < this.categories.length - 1 && newPos >= this.categories[toIndex + 1].position) {
+        needsReindex = true;
+      }
+
+      item.position = newPos;
+
+      if (needsReindex) {
+        this.categories.forEach((cat, idx) => {
+          cat.position = (idx + 1) * 2000;
+        });
+        await Promise.all(this.categories.map((cat) =>
+          this.api('PUT', `/categories/${cat.id}`, { position: cat.position })
+        ));
+      } else {
+        await this.api('PUT', `/categories/${item.id}`, { position: item.position });
+      }
     },
 
     onCatDragEnd(e) {
