@@ -240,9 +240,6 @@ createApp({
     const urlToken = urlParams.get('token');
     if (urlToken) {
       sessionStorage.setItem('stagedoer-token', urlToken);
-      // Clean token from URL bar without reload
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
     }
     this.token = urlToken || sessionStorage.getItem('stagedoer-token') || '';
 
