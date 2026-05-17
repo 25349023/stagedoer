@@ -68,7 +68,9 @@ async def create_task(body: TaskCreate, db: AsyncSession = Depends(get_db)):
             Task.category_id == body.category_id,
             Task.parent_task_id == body.parent_task_id,
         )
-    ) or -1
+    )
+    if max_pos is None:
+        max_pos = 0
 
     task = Task(
         title=body.title,
@@ -76,7 +78,7 @@ async def create_task(body: TaskCreate, db: AsyncSession = Depends(get_db)):
         task_type_id=body.task_type_id,
         current_stage_id=first_stage.id if first_stage else None,
         parent_task_id=body.parent_task_id,
-        position=max_pos + 1,
+        position=max_pos + 2000,
     )
     db.add(task)
     await db.commit()
@@ -101,6 +103,8 @@ async def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
     if body.title is not None:
         task.title = body.title
+    if body.position is not None:
+        task.position = body.position
     if body.task_type_id is not None and body.task_type_id != task.task_type_id:
         task.task_type_id = body.task_type_id
         if body.current_stage_id is None:
@@ -116,6 +120,7 @@ async def update_task(
     if body.current_stage_id is not None:
         task.current_stage_id = body.current_stage_id
     await db.commit()
+
     result = await db.execute(stmt)
     return result.scalar_one()
 

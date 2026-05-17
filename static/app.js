@@ -6,8 +6,17 @@ const TaskItem = {
   props: {
     task: { type: Object, required: true },
     taskTypes: { type: Array, required: true },
+    index: { type: Number },
+    isDragOverUp: { type: Boolean, default: false },
+    isDragOverDown: { type: Boolean, default: false },
   },
-  emits: ['advance', 'set-stage', 'change-type', 'rename', 'add-sub', 'delete'],
+  emits: ['advance', 'set-stage', 'change-type', 'rename', 'add-sub', 'delete', 'dragstart', 'dragover', 'dragleave', 'drop', 'dragend', 'update-task-pos', 'reindex-tasks'],
+  data() {
+    return {
+      draggedSubIndex: null,
+      dragOverSubIndex: null,
+    };
+  },
   computed: {
     taskStages() {
       const tt = this.taskTypes.find(t => t.id === this.task.task_type_id);
@@ -44,10 +53,62 @@ const TaskItem = {
     forwardEvent(name, ...args) {
       this.$emit(name, ...args);
     },
+    onSubDragStart(e, idx) {
+      this.draggedSubIndex = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => { if (e.target && e.target.classList) e.target.classList.add('dragging'); }, 0);
+    },
+    onSubDragOver(e, idx) {
+      if (this.draggedSubIndex !== null && this.draggedSubIndex !== idx) {
+        this.dragOverSubIndex = idx;
+      }
+    },
+    onSubDragLeave(e, idx) {
+      if (this.dragOverSubIndex === idx) this.dragOverSubIndex = null;
+    },
+    async onSubDrop(e, idx) {
+      const fromIndex = this.draggedSubIndex;
+      const toIndex = idx;
+      this.dragOverSubIndex = null;
+      this.draggedSubIndex = null;
+      if (e.target && e.target.classList) e.target.classList.remove('dragging');
+      if (fromIndex === null || fromIndex === toIndex) return;
+
+      const item = this.task.subtasks.splice(fromIndex, 1)[0];
+      this.task.subtasks.splice(toIndex, 0, item);
+
+      const { newPos, needsReindex } = getDropPosition(this.task.subtasks, toIndex);
+      item.position = newPos;
+
+      if (needsReindex) {
+        applyReindex(this.task.subtasks);
+        this.$emit('reindex-tasks', this.task.subtasks);
+      } else {
+        this.$emit('update-task-pos', item.id, item.position);
+      }
+    },
+    onSubDragEnd(e) {
+      if (e.target && e.target.classList) e.target.classList.remove('dragging');
+      this.draggedSubIndex = null;
+      this.dragOverSubIndex = null;
+    }
   },
   template: `
     <div class="task-item">
-      <div class="task-row">
+      <div 
+        class="task-row"
+        :class="{
+          'drag-over-up': isDragOverUp,
+          'drag-over-down': isDragOverDown
+        }"
+        draggable="true"
+        @dragstart="$emit('dragstart', $event, index)"
+        @dragover.prevent="$emit('dragover', $event, index)"
+        @dragleave.prevent="$emit('dragleave', $event, index)"
+        @drop.stop="$emit('drop', $event, index)"
+        @dragend="$emit('dragend', $event)"
+      >
+        <span class="drag-handle" style="cursor: grab; color: var(--text-muted); opacity: 0.5; margin-right: 4px;">⋮⋮</span>
         <span
           class="stage-circle"
           :class="stageCircleClass"
@@ -86,16 +147,26 @@ const TaskItem = {
 
       <div class="subtasks" v-if="task.subtasks && task.subtasks.length">
         <task-item
-          v-for="sub in task.subtasks"
+          v-for="(sub, idx) in task.subtasks"
           :key="sub.id"
           :task="sub"
           :task-types="taskTypes"
+          :index="idx"
+          :is-drag-over-up="dragOverSubIndex === idx && draggedSubIndex !== null && draggedSubIndex > idx"
+          :is-drag-over-down="dragOverSubIndex === idx && draggedSubIndex !== null && draggedSubIndex < idx"
+          @dragstart="onSubDragStart"
+          @dragover="onSubDragOver"
+          @dragleave="onSubDragLeave"
+          @drop="onSubDrop"
+          @dragend="onSubDragEnd"
           @advance="(id) => forwardEvent('advance', id)"
           @set-stage="(id, stageId) => forwardEvent('set-stage', id, stageId)"
           @change-type="(id, typeId) => forwardEvent('change-type', id, typeId)"
           @rename="(id, title) => forwardEvent('rename', id, title)"
           @add-sub="(id) => forwardEvent('add-sub', id)"
-          @delete="(task) => forwardEvent('delete', task)"
+          @delete="(t) => forwardEvent('delete', t)"
+          @update-task-pos="(id, pos) => forwardEvent('update-task-pos', id, pos)"
+          @reindex-tasks="(tasks) => forwardEvent('reindex-tasks', tasks)"
         ></task-item>
       </div>
     </div>
@@ -126,6 +197,8 @@ createApp({
       // Drag state
       draggedCatIndex: null,
       dragOverCatIndex: null,
+      draggedTaskIndex: null,
+      dragOverTaskIndex: null,
 
       // UI state
       darkMode: false,
@@ -297,33 +370,11 @@ createApp({
       const item = this.categories.splice(fromIndex, 1)[0];
       this.categories.splice(toIndex, 0, item);
 
-      let newPos;
-      if (this.categories.length === 1) {
-        newPos = 2000;
-      } else if (toIndex === 0) {
-        newPos = this.categories[1].position - 2000;
-      } else if (toIndex === this.categories.length - 1) {
-        newPos = this.categories[toIndex - 1].position + 2000;
-      } else {
-        const prevPos = this.categories[toIndex - 1].position;
-        const nextPos = this.categories[toIndex + 1].position;
-        newPos = Math.floor((prevPos + nextPos) / 2);
-      }
-
-      let needsReindex = false;
-      if (toIndex > 0 && newPos <= this.categories[toIndex - 1].position) {
-        needsReindex = true;
-      }
-      if (toIndex < this.categories.length - 1 && newPos >= this.categories[toIndex + 1].position) {
-        needsReindex = true;
-      }
-
+      const { newPos, needsReindex } = getDropPosition(this.categories, toIndex);
       item.position = newPos;
 
       if (needsReindex) {
-        this.categories.forEach((cat, idx) => {
-          cat.position = (idx + 1) * 2000;
-        });
+        applyReindex(this.categories);
         await Promise.all(this.categories.map((cat) =>
           this.api('PUT', `/categories/${cat.id}`, { position: cat.position })
         ));
@@ -518,6 +569,62 @@ createApp({
       this.tasks = replaceTaskInTree(this.tasks, updated);
     },
 
+    async updateTaskPos(id, pos) {
+      await this.api('PUT', `/tasks/${id}`, { position: pos });
+    },
+
+    async reindexTasks(tasks) {
+      await Promise.all(tasks.map(t => this.api('PUT', `/tasks/${t.id}`, { position: t.position })));
+    },
+
+    onTaskDragStart(e, index) {
+      this.draggedTaskIndex = index;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => { if (e.target && e.target.classList) e.target.classList.add('dragging'); }, 0);
+    },
+
+    onTaskDragOver(e, index) {
+      if (this.draggedTaskIndex !== null && this.draggedTaskIndex !== index) {
+        this.dragOverTaskIndex = index;
+      }
+    },
+
+    onTaskDragLeave(e, index) {
+      if (this.dragOverTaskIndex === index) {
+        this.dragOverTaskIndex = null;
+      }
+    },
+
+    async onTaskDrop(e, index) {
+      const fromIndex = this.draggedTaskIndex;
+      const toIndex = index;
+
+      this.dragOverTaskIndex = null;
+      this.draggedTaskIndex = null;
+      if (e.target && e.target.classList) e.target.classList.remove('dragging');
+
+      if (fromIndex === null || fromIndex === toIndex) return;
+
+      const item = this.tasks.splice(fromIndex, 1)[0];
+      this.tasks.splice(toIndex, 0, item);
+
+      const { newPos, needsReindex } = getDropPosition(this.tasks, toIndex);
+      item.position = newPos;
+
+      if (needsReindex) {
+        applyReindex(this.tasks);
+        await this.reindexTasks(this.tasks);
+      } else {
+        await this.updateTaskPos(item.id, item.position);
+      }
+    },
+
+    onTaskDragEnd(e) {
+      if (e.target && e.target.classList) e.target.classList.remove('dragging');
+      this.draggedTaskIndex = null;
+      this.dragOverTaskIndex = null;
+    },
+
     async advanceStage(id) {
       const updated = await this.api('POST', `/tasks/${id}/advance-stage`);
       this.tasks = replaceTaskInTree(this.tasks, updated);
@@ -570,5 +677,36 @@ function addSubtaskToTree(list, parentId, newTask) {
       return { ...t, subtasks: addSubtaskToTree(t.subtasks, parentId, newTask) };
     }
     return t;
+  });
+}
+
+function getDropPosition(list, toIndex) {
+  let newPos;
+  if (list.length === 1) {
+    newPos = 2000;
+  } else if (toIndex === 0) {
+    newPos = list[1].position - 2000;
+  } else if (toIndex === list.length - 1) {
+    newPos = list[toIndex - 1].position + 2000;
+  } else {
+    const prevPos = list[toIndex - 1].position;
+    const nextPos = list[toIndex + 1].position;
+    newPos = Math.floor((prevPos + nextPos) / 2);
+  }
+
+  let needsReindex = false;
+  if (toIndex > 0 && newPos <= list[toIndex - 1].position) {
+    needsReindex = true;
+  }
+  if (toIndex < list.length - 1 && newPos >= list[toIndex + 1].position) {
+    needsReindex = true;
+  }
+
+  return { newPos, needsReindex };
+}
+
+function applyReindex(list, spacing = 2000) {
+  list.forEach((item, idx) => {
+    item.position = (idx + 1) * spacing;
   });
 }

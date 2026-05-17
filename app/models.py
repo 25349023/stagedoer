@@ -45,7 +45,7 @@ class Stage(Base):
         Integer, ForeignKey("task_types.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    position: Mapped[int] = mapped_column(Integer, default=0)
+    position: Mapped[int] = mapped_column(Integer, default=0, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     task_type: Mapped["TaskType"] = relationship("TaskType", back_populates="stages")
@@ -68,7 +68,7 @@ class Task(Base):
     parent_task_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
     )
-    position: Mapped[int] = mapped_column(Integer, default=0)
+    position: Mapped[int] = mapped_column(Integer, default=0, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

@@ -240,18 +240,20 @@ input, select { font-family: inherit; font-size: inherit; }
 .category-item.active .category-delete { color: rgba(255,255,255,0.65); }
 .category-item.active .category-delete:hover { color: #fff; background: rgba(255,255,255,0.15); }
 
-.category-item.dragging {
+.category-item.dragging, .task-row.dragging {
   opacity: 0.5;
   background: var(--bg-elevated);
 }
-.category-item.drag-over-up {
+.category-item.drag-over-up, .task-row.drag-over-up {
   box-shadow: 0 -2px 0 var(--accent);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
-.category-item.drag-over-down {
+.category-item.drag-over-down, .task-row.drag-over-down {
   box-shadow: 0 2px 0 var(--accent);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
+.category-item.drag-over-up { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.category-item.drag-over-down { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.task-row.drag-over-up { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.task-row.drag-over-down { border-radius: var(--radius-md) var(--radius-md) 0 0; }
 
 .category-name {
   flex: 1;

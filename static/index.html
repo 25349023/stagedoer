@@ -86,16 +86,26 @@
 
         <div class="task-list" v-if="selectedCategory">
           <task-item
-            v-for="task in tasks"
+            v-for="(task, index) in tasks"
             :key="task.id"
             :task="task"
             :task-types="taskTypes"
+            :index="index"
+            :is-drag-over-up="dragOverTaskIndex === index && draggedTaskIndex !== null && draggedTaskIndex > index"
+            :is-drag-over-down="dragOverTaskIndex === index && draggedTaskIndex !== null && draggedTaskIndex < index"
+            @dragstart="onTaskDragStart"
+            @dragover="onTaskDragOver"
+            @dragleave="onTaskDragLeave"
+            @drop="onTaskDrop"
+            @dragend="onTaskDragEnd"
             @advance="advanceStage"
             @set-stage="setStage"
             @change-type="changeTaskType"
             @rename="updateTaskTitle"
             @add-sub="openAddTask"
             @delete="deleteTask"
+            @update-task-pos="updateTaskPos"
+            @reindex-tasks="reindexTasks"
           ></task-item>
         </div>
       </main>
