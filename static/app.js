@@ -57,16 +57,6 @@ const TaskItem = {
 
         <select
           class="stage-select"
-          :value="task.task_type_id"
-          @change="onTaskTypeChange"
-          title="Task type"
-          style="margin-right: 4px;"
-        >
-          <option v-for="tt in taskTypes" :key="tt.id" :value="tt.id">{{ tt.name }}</option>
-        </select>
-
-        <select
-          class="stage-select"
           :value="task.current_stage_id"
           @change="onStageChange"
         >
@@ -79,6 +69,16 @@ const TaskItem = {
           @blur="onTitleBlur"
           @keydown.enter.prevent="$event.target.blur()"
         />
+
+        <select
+          class="stage-select"
+          :value="task.task_type_id"
+          @change="onTaskTypeChange"
+          title="Task type"
+          style="margin-right: 4px;"
+        >
+          <option v-for="tt in taskTypes" :key="tt.id" :value="tt.id">{{ tt.name }}</option>
+        </select>
 
         <button class="task-action-btn" @click="$emit('add-sub', task.id)" title="Add subtask">+sub</button>
         <button class="task-delete-btn" @click="$emit('delete', task.id)" title="Delete task">×</button>
