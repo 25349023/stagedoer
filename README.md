@@ -4,7 +4,6 @@
 
 StageDoer takes traditional todo lists to the next level. Instead of simple binary "done/not done" checkboxes, StageDoer lets you define custom multi-stage workflows (e.g., *Todo → In Progress → Review → Done*) tailored to your projects. With robust support for nested subtasks at any depth, clean category organization, and lightning-fast reactivity, managing complex tasks has never been easier.
 
----
 
 ## ✨ Features
 
@@ -15,7 +14,6 @@ StageDoer takes traditional todo lists to the next level. Instead of simple bina
 - **Built-in Dark & Light Modes:** Clean, polished interface with instant theme switching that remembers your preference.
 - **Secure by Default:** Every server launch automatically generates a unique access token so your personal tasks stay private.
 
----
 
 ## 🚀 Installation
 
@@ -39,7 +37,6 @@ StageDoer takes traditional todo lists to the next level. Instead of simple bina
    ```
    *(Alternatively, if you use `uv`, you can run `uv sync` or `uv pip install -e .`)*
 
----
 
 ## 💻 Getting Started
 
@@ -72,7 +69,6 @@ If you want to access StageDoer from another device on your local network or ser
 stagedoer --public
 ```
 
----
 
 ## 📖 Quick Usage Guide
 
@@ -82,9 +78,8 @@ stagedoer --public
 4. **Tracking Progress:** Click the numbered circle next to any task to advance it to the next stage.
 5. **Subtasks:** Click **"+ sub"** on any existing task to add nested steps. Subtasks inherit the flexibility of independent tasks while staying cleanly organized under their parent.
 
----
 
 ## ⚠️ Disclaimer
 
-> This application was developed primarily through "vibe-coding" (AI-assisted rapid prototyping). While fully functional, the codebase has not undergone formal security audits. Please be aware of potential security risks and vulnerabilities—particularly when using the `--public` flag on untrusted networks or hosting in multi-user environments. Use at your own risk.
+This application was developed primarily through "vibe-coding" (AI-assisted rapid prototyping). While fully functional, the codebase has not undergone formal security audits. Please be aware of potential security risks and vulnerabilities—particularly when using the `--public` flag on untrusted networks or hosting in multi-user environments. Use at your own risk.
 
