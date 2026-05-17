@@ -81,7 +81,7 @@ const TaskItem = {
         </select>
 
         <button class="task-action-btn" @click="$emit('add-sub', task.id)" title="Add subtask">+sub</button>
-        <button class="task-delete-btn" @click="$emit('delete', task.id)" title="Delete task">×</button>
+        <button class="task-delete-btn" @click="$emit('delete', task)" title="Delete task">×</button>
       </div>
 
       <div class="subtasks" v-if="task.subtasks && task.subtasks.length">
@@ -95,7 +95,7 @@ const TaskItem = {
           @change-type="(id, typeId) => forwardEvent('change-type', id, typeId)"
           @rename="(id, title) => forwardEvent('rename', id, title)"
           @add-sub="(id) => forwardEvent('add-sub', id)"
-          @delete="(id) => forwardEvent('delete', id)"
+          @delete="(task) => forwardEvent('delete', task)"
         ></task-item>
       </div>
     </div>
@@ -323,11 +323,13 @@ createApp({
     },
 
     async deleteCategory(id) {
-      const confirmed = await this.openConfirm('Delete Category', 'Delete this category and all its tasks?', true, 'Delete');
+      const cat = this.categories.find(c => c.id === id);
+      const name = cat ? cat.name : 'this category';
+      const confirmed = await this.openConfirm('Delete Category', `Delete category "${name}" and all its tasks?`, true, 'Delete');
       if (!confirmed) return;
       await this.api('DELETE', `/categories/${id}`);
       this.categories = this.categories.filter(c => c.id !== id);
-      this.showToast('Category deleted');
+      this.showToast(`Category "${name}" deleted`);
       if (this.selectedCategoryId === id) {
         this.tasks = [];
         this.selectedCategoryId = this.categories[0]?.id || null;
@@ -421,12 +423,14 @@ createApp({
     },
 
     async deleteTaskType(id) {
-      const confirmed = await this.openConfirm('Delete Task Type', 'Delete this task type?', true, 'Delete');
+      const tt = this.taskTypes.find(t => t.id === id);
+      const name = tt ? tt.name : 'this task type';
+      const confirmed = await this.openConfirm('Delete Task Type', `Delete task type "${name}"?`, true, 'Delete');
       if (!confirmed) return;
       try {
         await this.api('DELETE', `/task-types/${id}`);
         this.taskTypes = this.taskTypes.filter(t => t.id !== id);
-        this.showToast('Task type deleted');
+        this.showToast(`Task type "${name}" deleted`);
       } catch {
         // errorMsg already set in api()
       }
@@ -477,12 +481,12 @@ createApp({
       this.showAddTaskModal = false;
     },
 
-    async deleteTask(id) {
-      const confirmed = await this.openConfirm('Delete Task', 'Are you sure you want to delete this task?', true, 'Delete');
+    async deleteTask(task) {
+      const confirmed = await this.openConfirm('Delete Task', `Are you sure you want to delete task "${task.title}"?`, true, 'Delete');
       if (!confirmed) return;
-      await this.api('DELETE', `/tasks/${id}`);
-      this.tasks = removeTaskFromTree(this.tasks, id);
-      this.showToast('Task deleted');
+      await this.api('DELETE', `/tasks/${task.id}`);
+      this.tasks = removeTaskFromTree(this.tasks, task.id);
+      this.showToast(`Task "${task.title}" deleted`);
     },
 
     async updateTaskTitle(id, title) {
