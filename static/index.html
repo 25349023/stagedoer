@@ -180,7 +180,9 @@
             <option disabled value="">Select task type</option>
             <option v-for="tt in taskTypes" :key="tt.id" :value="tt.id">{{ tt.name }}</option>
           </select>
-          <button type="submit" class="btn btn-primary">Add</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
         </form>
       </div>
     </div>
