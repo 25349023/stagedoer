@@ -81,6 +81,7 @@ body.transitions-ready {
 
 ul { list-style: none; }
 button { cursor: pointer; border: none; background: none; font-family: inherit; font-size: inherit; }
+button:disabled { cursor: not-allowed !important; opacity: 0.4; }
 input, select { font-family: inherit; font-size: inherit; }
 
 /* ============================================================
@@ -238,6 +239,19 @@ input, select { font-family: inherit; font-size: inherit; }
 }
 .category-item.active .category-delete { color: rgba(255,255,255,0.65); }
 .category-item.active .category-delete:hover { color: #fff; background: rgba(255,255,255,0.15); }
+
+.category-item.dragging {
+  opacity: 0.5;
+  background: var(--bg-elevated);
+}
+.category-item.drag-over-up {
+  box-shadow: 0 -2px 0 var(--accent);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+.category-item.drag-over-down {
+  box-shadow: 0 2px 0 var(--accent);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
 
 .category-name {
   flex: 1;

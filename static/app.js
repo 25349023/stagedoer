@@ -123,6 +123,10 @@ createApp({
       // Selection
       selectedCategoryId: null,
 
+      // Drag state
+      draggedCatIndex: null,
+      dragOverCatIndex: null,
+
       // UI state
       darkMode: false,
       showTaskTypeModal: false,
@@ -265,6 +269,49 @@ createApp({
     // ----------------------------------------------------------
     async fetchCategories() {
       this.categories = await this.api('GET', '/categories/');
+    },
+
+    onCatDragStart(e, index) {
+      this.draggedCatIndex = index;
+      e.dataTransfer.effectAllowed = 'move';
+      // Use setTimeout to allow the drag image to be generated before adding the class
+      setTimeout(() => { if (e.target && e.target.classList) e.target.classList.add('dragging'); }, 0);
+    },
+
+    onCatDragOver(e, index) {
+      if (this.draggedCatIndex !== null && this.draggedCatIndex !== index) {
+        this.dragOverCatIndex = index;
+      }
+    },
+
+    async onCatDrop(e, index) {
+      const fromIndex = this.draggedCatIndex;
+      const toIndex = index;
+
+      this.dragOverCatIndex = null;
+      this.draggedCatIndex = null;
+      if (e.target && e.target.classList) e.target.classList.remove('dragging');
+
+      if (fromIndex === null || fromIndex === toIndex) return;
+
+      const item = this.categories.splice(fromIndex, 1)[0];
+      this.categories.splice(toIndex, 0, item);
+
+      // Re-assign positions
+      this.categories.forEach((cat, idx) => {
+        cat.position = idx;
+      });
+
+      // Update API
+      await Promise.all(this.categories.map((cat) =>
+        this.api('PUT', `/categories/${cat.id}`, { position: cat.position })
+      ));
+    },
+
+    onCatDragEnd(e) {
+      if (e.target && e.target.classList) e.target.classList.remove('dragging');
+      this.draggedCatIndex = null;
+      this.dragOverCatIndex = null;
     },
 
     async addCategory() {

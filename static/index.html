@@ -45,13 +45,26 @@
           </div>
           <ul class="category-list">
             <li
-              v-for="cat in categories"
+              v-for="(cat, index) in categories"
               :key="cat.id"
               class="category-item"
-              :class="{ active: selectedCategoryId === cat.id }"
+              :class="{ 
+                active: selectedCategoryId === cat.id, 
+                'drag-over-up': dragOverCatIndex === index && draggedCatIndex > index,
+                'drag-over-down': dragOverCatIndex === index && draggedCatIndex < index
+              }"
+              draggable="true"
+              @dragstart="onCatDragStart($event, index)"
+              @dragover.prevent="onCatDragOver($event, index)"
+              @dragleave.prevent="dragOverCatIndex === index ? dragOverCatIndex = null : null"
+              @drop="onCatDrop($event, index)"
+              @dragend="onCatDragEnd"
               @click="selectCategory(cat.id)"
             >
-              <span class="category-name">{{ cat.name }}</span>
+              <div class="category-name" style="display: flex; align-items: center; gap: 6px;">
+                <span class="drag-handle" style="cursor: grab; color: var(--text-muted); opacity: 0.5;">⋮⋮</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ cat.name }}</span>
+              </div>
               <div class="category-actions" style="display: flex; gap: 4px;">
                 <button class="category-edit" style="background: none; border: none; cursor: pointer; color: var(--text-muted);" @click.stop="renameCategory(cat.id, cat.name)" title="Rename category">✎</button>
                 <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
