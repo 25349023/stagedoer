@@ -108,7 +108,7 @@ const TaskItem = {
         @drop.stop="$emit('drop', $event, index)"
         @dragend="$emit('dragend', $event)"
       >
-        <span class="drag-handle" style="cursor: grab; color: var(--text-muted); opacity: 0.5; margin-right: 4px;">⋮⋮</span>
+        <span class="drag-handle" style="cursor: grab; color: var(--text-muted); opacity: 0.75; margin-right: 4px;">⋮⋮</span>
         <span
           class="stage-circle"
           :class="stageCircleClass"
