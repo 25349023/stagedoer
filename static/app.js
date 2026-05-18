@@ -623,13 +623,54 @@ createApp({
     },
 
     async advanceStage(id) {
-      const updated = await this.api('POST', `/tasks/${id}/advance-stage`);
-      this.tasks = replaceTaskInTree(this.tasks, updated);
+      const target = findTaskInTree(this.tasks, id);
+      if (!target) return;
+
+      const previousStageId = target.current_stage_id;
+      const tt = this.taskTypes.find(t => t.id === target.task_type_id);
+      if (!tt || !tt.stages || !tt.stages.length) return;
+
+      const currentIdx = tt.stages.findIndex(s => s.id === previousStageId);
+      const nextIdx = (currentIdx + 1) % tt.stages.length;
+      const nextStageId = tt.stages[nextIdx].id;
+
+      // Optimistically update local state
+      this.tasks = replaceTaskInTree(this.tasks, { ...target, current_stage_id: nextStageId });
+
+      try {
+        const updated = await this.api('POST', `/tasks/${id}/advance-stage`);
+        this.tasks = replaceTaskInTree(this.tasks, updated);
+      } catch (err) {
+        // Revert on error
+        const currentTarget = findTaskInTree(this.tasks, id);
+        if (currentTarget) {
+          this.tasks = replaceTaskInTree(this.tasks, { ...currentTarget, current_stage_id: previousStageId });
+        }
+        this.showToast('Failed to advance stage. Reverted change.', 'error');
+      }
     },
 
     async setStage(id, stageId) {
-      const updated = await this.api('PUT', `/tasks/${id}`, { current_stage_id: stageId });
-      this.tasks = replaceTaskInTree(this.tasks, updated);
+      const target = findTaskInTree(this.tasks, id);
+      if (!target) return;
+
+      const previousStageId = target.current_stage_id;
+      if (previousStageId === stageId) return;
+
+      // Optimistically update local state
+      this.tasks = replaceTaskInTree(this.tasks, { ...target, current_stage_id: stageId });
+
+      try {
+        const updated = await this.api('PUT', `/tasks/${id}`, { current_stage_id: stageId });
+        this.tasks = replaceTaskInTree(this.tasks, updated);
+      } catch (err) {
+        // Revert on error
+        const currentTarget = findTaskInTree(this.tasks, id);
+        if (currentTarget) {
+          this.tasks = replaceTaskInTree(this.tasks, { ...currentTarget, current_stage_id: previousStageId });
+        }
+        this.showToast('Failed to update stage. Reverted change.', 'error');
+      }
     },
 
     async changeTaskType(id, typeId) {
@@ -706,4 +747,15 @@ function applyReindex(list, spacing = 2000) {
   list.forEach((item, idx) => {
     item.position = (idx + 1) * spacing;
   });
+}
+
+function findTaskInTree(list, id) {
+  for (const t of list) {
+    if (t.id === id) return t;
+    if (t.subtasks && t.subtasks.length) {
+      const found = findTaskInTree(t.subtasks, id);
+      if (found) return found;
+    }
+  }
+  return null;
 }

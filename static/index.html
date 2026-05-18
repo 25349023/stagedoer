@@ -228,7 +228,7 @@
           :class="'toast-' + toast.type"
           @click="removeToast(toast.id)"
         >
-          <span class="toast-icon">{{ toast.type === 'success' ? '✓' : 'ℹ️' }}</span>
+          <span class="toast-icon">{{ toast.type === 'success' ? '✓' : toast.type === 'error' ? '⚠️' : 'ℹ️' }}</span>
           <span class="toast-message">{{ toast.message }}</span>
         </div>
       </transition-group>
