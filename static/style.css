@@ -244,16 +244,16 @@ input, select { font-family: inherit; font-size: inherit; }
   opacity: 0.5;
   background: var(--bg-elevated);
 }
-.category-item.drag-over-up, .task-row.drag-over-up {
+.category-item.drag-over-up, .task-item.drag-over-up > .task-row {
   box-shadow: 0 -2px 0 var(--accent);
 }
-.category-item.drag-over-down, .task-row.drag-over-down {
+.category-item.drag-over-down, .task-item.drag-over-down {
   box-shadow: 0 2px 0 var(--accent);
 }
 .category-item.drag-over-up { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 .category-item.drag-over-down { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
-.task-row.drag-over-up { border-radius: 0 0 var(--radius-md) var(--radius-md); }
-.task-row.drag-over-down { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.task-item.drag-over-up > .task-row { border-top-left-radius: 0; border-top-right-radius: 0; }
+
 
 .category-name {
   flex: 1;

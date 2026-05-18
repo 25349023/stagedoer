@@ -61,6 +61,7 @@ const TaskItem = {
     },
     onSubDragOver(e, idx) {
       if (this.draggedSubIndex !== null && this.draggedSubIndex !== idx) {
+        if (e && e.stopPropagation) e.stopPropagation();
         this.dragOverSubIndex = idx;
       }
     },
@@ -68,6 +69,8 @@ const TaskItem = {
       if (this.dragOverSubIndex === idx) this.dragOverSubIndex = null;
     },
     async onSubDrop(e, idx) {
+      if (this.draggedSubIndex === null) return;
+      if (e && e.stopPropagation) e.stopPropagation();
       const fromIndex = this.draggedSubIndex;
       const toIndex = idx;
       this.dragOverSubIndex = null;
@@ -99,21 +102,32 @@ const TaskItem = {
     onDragEnd(e) {
       this.isDraggable = false;
       this.$emit('dragend', e);
+    },
+    onItemDragOver(e, index) {
+      this.$emit('dragover', e, index);
+    },
+    onItemDragLeave(e, index) {
+      this.$emit('dragleave', e, index);
+    },
+    onItemDrop(e, index) {
+      this.$emit('drop', e, index);
     }
   },
   template: `
-    <div class="task-item">
+    <div 
+      class="task-item"
+      :class="{
+        'drag-over-up': isDragOverUp,
+        'drag-over-down': isDragOverDown
+      }"
+      @dragover.prevent="onItemDragOver($event, index)"
+      @dragleave.prevent="onItemDragLeave($event, index)"
+      @drop="onItemDrop($event, index)"
+    >
       <div 
         class="task-row"
-        :class="{
-          'drag-over-up': isDragOverUp,
-          'drag-over-down': isDragOverDown
-        }"
         :draggable="isDraggable"
         @dragstart="onDragStart($event, index)"
-        @dragover.prevent="$emit('dragover', $event, index)"
-        @dragleave.prevent="$emit('dragleave', $event, index)"
-        @drop.stop="$emit('drop', $event, index)"
         @dragend="onDragEnd($event)"
       >
         <span 
@@ -598,6 +612,7 @@ createApp({
 
     onTaskDragOver(e, index) {
       if (this.draggedTaskIndex !== null && this.draggedTaskIndex !== index) {
+        if (e && e.stopPropagation) e.stopPropagation();
         this.dragOverTaskIndex = index;
       }
     },
@@ -609,6 +624,8 @@ createApp({
     },
 
     async onTaskDrop(e, index) {
+      if (this.draggedTaskIndex === null) return;
+      if (e && e.stopPropagation) e.stopPropagation();
       const fromIndex = this.draggedTaskIndex;
       const toIndex = index;
 
