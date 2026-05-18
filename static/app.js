@@ -483,7 +483,7 @@ createApp({
         if (idx !== -1) {
           this.taskTypes[idx] = updatedTt;
         }
-        this.showToast(`Task type updated`);
+        this.showToast(`Task type "${updatedTt.name}" updated`);
         this.cancelEditTaskType();
       } else {
         // Create
