@@ -15,6 +15,7 @@ const TaskItem = {
     return {
       draggedSubIndex: null,
       dragOverSubIndex: null,
+      isDraggable: false,
     };
   },
   computed: {
@@ -91,6 +92,13 @@ const TaskItem = {
       if (e.target && e.target.classList) e.target.classList.remove('dragging');
       this.draggedSubIndex = null;
       this.dragOverSubIndex = null;
+    },
+    onDragStart(e, index) {
+      this.$emit('dragstart', e, index);
+    },
+    onDragEnd(e) {
+      this.isDraggable = false;
+      this.$emit('dragend', e);
     }
   },
   template: `
@@ -101,14 +109,22 @@ const TaskItem = {
           'drag-over-up': isDragOverUp,
           'drag-over-down': isDragOverDown
         }"
-        draggable="true"
-        @dragstart="$emit('dragstart', $event, index)"
+        :draggable="isDraggable"
+        @dragstart="onDragStart($event, index)"
         @dragover.prevent="$emit('dragover', $event, index)"
         @dragleave.prevent="$emit('dragleave', $event, index)"
         @drop.stop="$emit('drop', $event, index)"
-        @dragend="$emit('dragend', $event)"
+        @dragend="onDragEnd($event)"
       >
-        <span class="drag-handle" style="cursor: grab; color: var(--text-muted); opacity: 0.75; margin-right: 4px;">⋮⋮</span>
+        <span 
+          class="drag-handle" 
+          style="cursor: grab; color: var(--text-muted); opacity: 0.75; margin-right: 4px;"
+          @mousedown="isDraggable = true"
+          @mouseup="isDraggable = false"
+          @touchstart="isDraggable = true"
+          @touchend="isDraggable = false"
+          title="Drag to reorder"
+        >⋮⋮</span>
         <span
           class="stage-circle"
           :class="stageCircleClass"
