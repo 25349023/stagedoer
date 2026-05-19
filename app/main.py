@@ -81,6 +81,12 @@ app.include_router(tasks.router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon/favicon.ico")
+
+
 @app.get("/")
 async def index():
     return FileResponse("static/index.html")
+
