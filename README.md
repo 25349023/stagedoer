@@ -2,6 +2,8 @@
 
 > A powerful, intuitive, multi-stage todo list and project management web application.
 
+🚀 **Try the Live Demo:** [https://25349023.github.io/stagedoer/](https://25349023.github.io/stagedoer/)
+
 StageDoer takes traditional todo lists to the next level. Instead of simple binary "done/not done" checkboxes, StageDoer lets you define custom multi-stage workflows (e.g., *Todo → In Progress → Review → Done*) tailored to your projects. With robust support for nested subtasks at any depth, clean category organization, and lightning-fast reactivity, managing complex tasks has never been easier.
 
 
