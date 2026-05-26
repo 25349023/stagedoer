@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StageDoer — Multi-Stage Todo</title>
+  <meta name="description"
+    content="StageDoer: track tasks through custom stages with nested subtasks and category organisation." />
+  <link rel="icon" type="image/png" href="./favicon/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="./favicon/favicon.svg" />
+  <link rel="shortcut icon" href="./favicon/favicon.ico" />
+  <link rel="apple-touch-icon" href="./favicon/apple-touch-icon.png" />
+  <link rel="manifest" href="./favicon/site.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Anti-FOUC: apply dark class synchronously before first paint -->
+  <script>
+    if (localStorage.getItem('stagedoer-dark') === 'true') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+
+  <!-- Pyodide CDN Scripts -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"
+    integrity="sha384-i3R37b3tF+HWudsUf1VSEOY2YxwSNMqY8DQa9Z0O3xh+NkJ9o+yjcGyIi5huj+nB"
+    crossorigin="anonymous"></script>
+
+  <!-- Pyodide boot logic and fetch interceptor -->
+  <style>
+    /* Minimal boot screen styles matching dark theme */
+    #wasm-boot-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .boot-content {
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .boot-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #818cf8;
+    }
+
+    .boot-step {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+      min-height: 1.5em;
+    }
+
+    .boot-bar {
+      height: 4px;
+      background: #1e293b;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .boot-fill {
+      height: 100%;
+      background: #6366f1;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .boot-error {
+      color: #f87171;
+      background: #450a0a;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      text-align: left;
+      overflow-wrap: break-word;
+    }
+  </style>
+
+  <div id="wasm-boot-screen">
+    <div class="boot-content">
+      <div class="boot-title">StageDoer WASM Backend</div>
+      <div class="boot-step" id="boot-step-text">Initializing...</div>
+      <div class="boot-bar">
+        <div class="boot-fill" id="boot-fill-bar"></div>
+      </div>
+      <div id="boot-error-container" style="display: none;" class="boot-error"></div>
+    </div>
+  </div>
+
+  <script>
+    (async function bootWasm() {
+      const stepText = document.getElementById('boot-step-text');
+      const fillBar = document.getElementById('boot-fill-bar');
+      const errorContainer = document.getElementById('boot-error-container');
+
+      const setProgress = (text, percent) => {
+        stepText.textContent = text;
+        fillBar.style.width = percent + '%';
+      };
+
+      try {
+        setProgress('Loading Pyodide...', 10);
+        const pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' });
+
+        setProgress('Loading core packages (SQLAlchemy, SSL)...', 30);
+        await pyodide.loadPackage(['micropip', 'sqlalchemy', 'ssl']);
+
+        setProgress('Installing FastAPI via micropip...', 50);
+        const micropip = pyodide.pyimport('micropip');
+        await micropip.install(['fastapi==0.110.3', 'anyio==4.3.0']);
+
+        setProgress('Booting Python backend...', 75);
+        const codeRes = await fetch('./main.py');
+        if (!codeRes.ok) throw new Error("Failed to fetch main.py");
+        const code = await codeRes.text();
+        const injected = 'import os\nos.environ["WASM_MODE"] = "1"\n' + code;
+        await pyodide.runPythonAsync(injected);
+
+        setProgress('Ready', 100);
+
+        // --- Intercept Fetch ---
+        const originalFetch = window.fetch;
+        window.fetch = async function (...args) {
+          let url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url);
+          const opts = args[1] || {};
+
+          // Only intercept API calls
+          if (url && url.startsWith('/api/')) {
+            const method = opts.method || 'GET';
+            const body = opts.body ? String(opts.body) : null;
+
+            // Call the python bridge
+            pyodide.globals.set('_api_method', method);
+            pyodide.globals.set('_api_path', url);
+            pyodide.globals.set('_api_body', body);
+
+            const resultStr = await pyodide.runPythonAsync('await handle_browser_request(_api_method, _api_path, _api_body)');
+            const result = JSON.parse(resultStr);
+
+            // Construct a mock Response
+            return new Response(JSON.stringify(result.data), {
+              status: result.status,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          return originalFetch.apply(this, args);
+        };
+        // -----------------------
+
+
+        // Load the main app.js only AFTER fetch is intercepted
+        const script = document.createElement('script');
+        script.src = './app.js';
+        document.body.appendChild(script);
+
+        // Hide boot screen
+        setTimeout(() => {
+          document.getElementById('wasm-boot-screen').style.display = 'none';
+        }, 500);
+
+      } catch (err) {
+        errorContainer.style.display = 'block';
+        errorContainer.textContent = err.stack || err;
+        setProgress('Boot failed', 100);
+        fillBar.style.background = '#f87171';
+      }
+    })();
+  </script>
+
+  <div id="app" v-cloak>
+
+    <!-- ── TOP BAR ──────────────────────────────────────────────── -->
+    <header class="topbar">
+      <span class="topbar-logo">StageDoer</span>
+      <div class="topbar-actions">
+        <button id="btn-manage-types" class="btn btn-secondary" @click="showTaskTypeModal = true">
+          Manage Task Types
+        </button>
+        <button id="btn-theme-toggle" class="theme-toggle" @click="toggleDark"
+          :title="darkMode ? 'Switch to light' : 'Switch to dark'">
+          <span v-if="darkMode">☀️</span>
+          <span v-else>🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── MAIN LAYOUT ──────────────────────────────────────────── -->
+    <div class="layout">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-sticky">
+          <div class="sidebar-header">
+            <span class="sidebar-title">CATEGORIES</span>
+            <button id="btn-add-category" class="icon-btn" @click="addCategory" title="New category">＋</button>
+          </div>
+          <ul class="category-list">
+            <li v-for="(cat, index) in categories" :key="cat.id" class="category-item" :class="{ 
+                active: selectedCategoryId === cat.id, 
+                'drag-over-up': dragOverCatIndex === index && draggedCatIndex > index,
+                'drag-over-down': dragOverCatIndex === index && draggedCatIndex < index
+              }" draggable="true" @dragstart="onCatDragStart($event, index)"
+              @dragover.prevent="onCatDragOver($event, index)"
+              @dragleave.prevent="dragOverCatIndex === index ? dragOverCatIndex = null : null"
+              @drop="onCatDrop($event, index)" @dragend="onCatDragEnd" @click="selectCategory(cat.id)">
+              <div class="category-name" style="display: flex; align-items: center; gap: 6px;">
+                <span class="drag-handle" style="cursor: grab; color: var(--text-muted); opacity: 0.75;">⋮⋮</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ cat.name }}</span>
+              </div>
+              <div class="category-actions" style="display: flex; gap: 4px;">
+                <button class="category-edit"
+                  style="background: none; border: none; cursor: pointer; color: var(--text-muted);"
+                  @click.stop="renameCategory(cat.id, cat.name)" title="Rename category">✎</button>
+                <button class="category-delete" @click.stop="deleteCategory(cat.id)" title="Delete category">×</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- MAIN AREA -->
+      <main class="main-area">
+        <div v-if="selectedCategory" class="main-header">
+          <h1 class="main-title">{{ selectedCategory.name }}</h1>
+          <button id="btn-add-task" class="btn btn-primary" @click="openAddTask(null)">＋ Add Task</button>
+        </div>
+        <div v-else class="empty-state">
+          <p>Select or create a category to get started.</p>
+        </div>
+
+        <div class="task-list" v-if="selectedCategory">
+          <task-item v-for="(task, index) in tasks" :key="task.id" :task="task" :task-types="taskTypes" :index="index"
+            :is-drag-over-up="dragOverTaskIndex === index && draggedTaskIndex !== null && draggedTaskIndex > index"
+            :is-drag-over-down="dragOverTaskIndex === index && draggedTaskIndex !== null && draggedTaskIndex < index"
+            @dragstart="onTaskDragStart" @dragover="onTaskDragOver" @dragleave="onTaskDragLeave" @drop="onTaskDrop"
+            @dragend="onTaskDragEnd" @advance="advanceStage" @set-stage="setStage" @change-type="changeTaskType"
+            @rename="updateTaskTitle" @add-sub="openAddTask" @delete="deleteTask" @update-task-pos="updateTaskPos"
+            @reindex-tasks="reindexTasks"></task-item>
+        </div>
+      </main>
+    </div>
+
+    <!-- ── MODAL: MANAGE TASK TYPES ────────────────────────────── -->
+    <div v-if="showTaskTypeModal" class="modal-overlay" @click.self="showTaskTypeModal = false">
+      <div class="modal-card" id="modal-task-types">
+        <div class="modal-header">
+          <h2>Manage Task Types</h2>
+          <button class="icon-btn" @click="showTaskTypeModal = false">×</button>
+        </div>
+
+        <div class="type-list">
+          <div v-for="tt in taskTypes" :key="tt.id" class="type-row">
+            <div class="type-info">
+              <span class="type-name">{{ tt.name }}</span>
+              <div class="stage-badges">
+                <span v-for="s in tt.stages" :key="s.id" class="stage-badge">{{ s.name }}</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" @click="editTaskType(tt)">Edit</button>
+              <button class="btn btn-danger btn-sm" @click="deleteTaskType(tt.id)">Delete</button>
+            </div>
+          </div>
+          <div v-if="taskTypes.length === 0" class="empty-hint">No task types yet.</div>
+        </div>
+
+        <div class="modal-divider"></div>
+        <h3 class="modal-sub">{{ typeForm.id ? 'Edit Task Type' : 'Create New Type' }}</h3>
+        <form @submit.prevent="saveTaskType" class="modal-form">
+          <input id="type-name" v-model="typeForm.name" class="input" placeholder="Type name (e.g. Feature)" required />
+          <input id="type-stages" v-model="typeForm.stages" class="input"
+            placeholder="Stages, comma-separated (e.g. Todo, In Progress, Done)" required />
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary">{{ typeForm.id ? 'Save' : 'Create' }}</button>
+            <button type="button" class="btn btn-secondary" v-if="typeForm.id"
+              @click="cancelEditTaskType">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── MODAL: ADD TASK / SUBTASK ────────────────────────────── -->
+    <div v-if="showAddTaskModal" class="modal-overlay" @click.self="showAddTaskModal = false">
+      <div class="modal-card" id="modal-add-task">
+        <div class="modal-header">
+          <h2>{{ newTaskForm.parent_task_id ? 'Add Subtask' : 'Add Task' }}</h2>
+          <button class="icon-btn" @click="showAddTaskModal = false">×</button>
+        </div>
+        <form @submit.prevent="addTask" class="modal-form">
+          <input id="new-task-title" v-model="newTaskForm.title" class="input" placeholder="Task title" required
+            autofocus />
+          <select id="new-task-type" v-model="newTaskForm.task_type_id" class="input" required>
+            <option disabled value="">Select task type</option>
+            <option v-for="tt in taskTypes" :key="tt.id" :value="tt.id">{{ tt.name }}</option>
+          </select>
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── MODAL: CONFIRM / PROMPT ────────────────────────────── -->
+    <div v-if="dialog.show" class="modal-overlay" @click.self="closeDialog(false)" style="z-index: 300;">
+      <div class="modal-card dialog-card" style="width: 400px;">
+        <div class="modal-header" style="margin-bottom: 12px;">
+          <h2>{{ dialog.title }}</h2>
+          <button class="icon-btn" @click="closeDialog(false)">×</button>
+        </div>
+        <p v-if="dialog.message" class="dialog-message"
+          style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.4;">{{ dialog.message }}</p>
+        <div v-if="dialog.type === 'prompt'" class="modal-form" style="margin-top: 16px;">
+          <input ref="dialogInput" v-model="dialog.input" class="input" :placeholder="dialog.placeholder"
+            @keyup.enter="closeDialog(true)" />
+        </div>
+        <div class="dialog-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+          <button class="btn btn-secondary" @click="closeDialog(false)">Cancel</button>
+          <button class="btn" :class="dialog.isDanger ? 'btn-danger' : 'btn-primary'" @click="closeDialog(true)">
+            {{ dialog.confirmText }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error banner -->
+    <div v-if="errorMsg" class="error-banner" @click="errorMsg = ''">
+      ⚠️ {{ errorMsg }} <span class="error-dismiss">✕</span>
+    </div>
+
+    <!-- ── TOAST CONTAINER ────────────────────────────── -->
+    <div class="toast-container">
+      <transition-group name="toast">
+        <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type"
+          @click="removeToast(toast.id)">
+          <span class="toast-icon">{{ toast.type === 'success' ? '✓' : toast.type === 'error' ? '⚠️' : 'ℹ️' }}</span>
+          <span class="toast-message">{{ toast.message }}</span>
+        </div>
+      </transition-group>
+    </div>
+
+  </div><!-- #app -->
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- app.js loaded dynamically -->
+</body>
+
+</html>
